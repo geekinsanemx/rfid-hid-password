@@ -334,5 +334,5 @@ def manage_password(password_to_store):
             print("Failed to write the password.")
 
 # Example usage
-password_to_store = "wtdMY8VSTTQ91qfW"  # Change this to your desired password (max 16 characters)
+password_to_store = "mypassword123"  # Change this to your desired password (max 16 characters)
 manage_password(password_to_store)
