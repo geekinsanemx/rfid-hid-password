@@ -15,14 +15,6 @@ rfid-smartcard-reader/
 │   └── example-store-big-password.py
 ├── lib
 │   ├── adafruit_hid
-│   │   ├── consumer_control_code.mpy
-│   │   ├── consumer_control.mpy
-│   │   ├── __init__.mpy
-│   │   ├── keyboard_layout_base.mpy
-│   │   ├── keyboard_layout_us.mpy
-│   │   ├── keyboard.mpy
-│   │   ├── keycode.mpy
-│   │   └── mouse.mpy
 │   └── mfrc522.py
 ├── LICENSE
 ├── README.md
