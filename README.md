@@ -7,24 +7,32 @@ This project demonstrates how to use an **RP2040-Zero** microcontroller to read 
 ## **Project Structure**
 ```
 rfid-smartcard-reader/
-├── clear_rfid_password.py
-├── code.py
-├── dump-rfid-smartcard.py
-├── example-read-improved.py
-├── example-read-mfc.py
-├── example-read-ntag.py
-├── example-read.py
-├── example-store-big-password.py
+├── examples
+│   ├── example-read-improved.py
+│   ├── example-read-mfc.py
+│   ├── example-read-ntag.py
+│   ├── example-read.py
+│   └── example-store-big-password.py
 ├── lib
 │   ├── adafruit_hid
-│   ├── adafruit_pn532
+│   │   ├── consumer_control_code.mpy
+│   │   ├── consumer_control.mpy
+│   │   ├── __init__.mpy
+│   │   ├── keyboard_layout_base.mpy
+│   │   ├── keyboard_layout_us.mpy
+│   │   ├── keyboard.mpy
+│   │   ├── keycode.mpy
+│   │   └── mouse.mpy
 │   └── mfrc522.py
+├── LICENSE
+├── README.md
 ├── rfid-hid-password.py
-├── rfid-password-manager.py
-├── smartcard_dump.py
-└── test-rfid-mfrc522.py
-├── README.md # Project documentation
-└── requirements.txt # List of required libraries
+└── utils
+    ├── clear_rfid_password.py
+    ├── dump-rfid-smartcard.py
+    ├── rfid-password-manager.py
+    └── smartcard_dump.py
+
 ```
 
 
