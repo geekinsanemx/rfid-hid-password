@@ -40,6 +40,49 @@ rfid-smartcard-reader/
 
 ## **Hardware Setup**
 
+### **Connecting the MFRC522 to RP2040-Zero:**
+    SDA/CS: Connect SDA on MFRC522 to GP0 on RP2040-Zero.
+    RST: Connect RST on MFRC522 to GP1 on RP2040-Zero.
+    SCK: Connect SCK on MFRC522 to GP2 on RP2040-Zero.
+    MOSI: Connect MOSI on MFRC522 to GP3 on RP2040-Zero.
+    MISO: Connect MISO on MFRC522 to GP4 on RP2040-Zero.
+
+    GND: Connect a GND from the MFRC522 to one of the GND pins on the RP2040-Zero.
+    3.3V: Connect the 3.3V pin from the MFRC522 to one of the 3.3V pins on RP2040-Zero.
+
+### **Connecting LEDs to RP2040-Zero:**
+    220-ohm resistor with a tolerance of ±5% would be color-coded: Red, Red, Brown, Gold.
+
+    Green LED (Access Granted):
+        Anode (longer leg) connects to GP27 on RP2040-Zero.
+        Cathode (shorter leg) connects through a 220-ohm resistor to a GND pin on RP2040-Zero.
+
+    Red LED (Unauthorized Access):
+        Anode (longer leg) connects to GP28 on RP2040-Zero.
+        Cathode (shorter leg) connects through a 220-ohm resistor to a GND pin on RP2040-Zero.
+
+    Blue LED (Device Ready):
+        Anode (longer leg) connects to GP29 on RP2040-Zero.
+        Cathode (shorter leg) connects through a 220-ohm resistor to a GND pin on RP2040-Zero.
+
+
+RP2040-Zero Board
+```
+│
+├─ GP0 ─> SDA (MFRC522 Module)
+├─ GP1 ─> RST (MFRC522 Module)
+├─ GP2 ─> SCK (MFRC522 Module)
+├─ GP3 ─> MOSI (MFRC522 Module)
+├─ GP4 ─> MISO (MFRC522 Module)
+│
+├─ 3V3 ─> 3.3V (MFRC522 Module)
+├─ GND ─> GND (MFRC522 Module)
+│
+├─ GP27 ─> [Green LED] --> [220-ohm Resistor] ---> GND
+└─ GP28 ─> [Red LED]  ---> [220-ohm Resistor] ---> GND
+└─ GP29 ─> [Blue LED] ---> [220-ohm Resistor] ---> GND
+```
+
 ### **RP2040-Zero Pin Connections**
 ```
 | RP2040-Zero Pin | MFRC522 Pin | LED Pin       | Description                     |
