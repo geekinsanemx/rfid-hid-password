@@ -7,30 +7,34 @@ This project demonstrates how to use an **RP2040-Zero** microcontroller to read 
 ## **Project Structure**
 ```
 rfid-smartcard-reader/
+.
 ├── default_key.json
-├── examples
-│ ├── example-read.py
-│ ├── mfc
-│ │ └── example-read-mfc.py
-│ ├── ntag
-│ │ └── example-read-ntag.py
-│ ├── test-gpio-leds.py
-│ └── test-rfid-hid-input.py
-├── lib
-│ ├── adafruit_hid
-│ └── mfrc522.py
-├── LICENSE
-├── README.md
 ├── rfid-hid-password.py
+|
+├── examples
+│   ├── example-read.py
+│   ├── mfc
+│   │   └── example-read-mfc.py
+│   ├── ntag
+│   │   └── example-read-ntag.py
+│   ├── test-gpio-leds.py
+│   └── test-rfid-hid-input.py
+|
+├── lib
+│   ├── adafruit_hid
+│   └── mfrc522.py
+|
 └── utils
-├── clear-rfid-password.py
-├── mfc
-│ ├── mfc-dump-rfid-smartcard.py
-│ └── mfc-store-big-password.py
-├── ntag
-│ └── ntag-dump-rfid-smartcard.py
-├── store-rfid-password.py
-└── validate-key-file.py
+    ├── clear-rfid-password.py
+    ├── mfc
+    │   ├── mfc-dump-rfid-smartcard.py
+    │   └── mfc-store-big-password.py
+    ├── ntag
+    │   └── ntag-dump-rfid-smartcard.py
+    ├── store-rfid-password.py
+    └── validate-key-file.py
+
+
 ```
 ---
 
