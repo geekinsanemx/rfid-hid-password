@@ -5,6 +5,7 @@ This project demonstrates how to use an **RP2040-Zero** microcontroller to read 
 ---
 
 ## **Project Structure**
+```
 rfid-smartcard-reader/
 ├── default_key.json
 ├── examples
@@ -30,13 +31,13 @@ rfid-smartcard-reader/
 │ └── ntag-dump-rfid-smartcard.py
 ├── store-rfid-password.py
 └── validate-key-file.py
-
+```
 ---
 
 ## **Hardware Setup**
 
 ### **RP2040-Zero Pin Connections**
-
+```
 | RP2040-Zero Pin | MFRC522 Pin | LED Pin       | Description                     |
 |-----------------|-------------|---------------|---------------------------------|
 | **GP2**         | SCK         | -             | SPI Clock                       |
@@ -49,7 +50,7 @@ rfid-smartcard-reader/
 | **GP29**        | -           | Blue LED      | Feedback LED for device on      |
 | **3.3V**        | 3.3V        | -             | Power for MFRC522 and LEDs      |
 | **GND**         | GND         | GND           | Ground for MFRC522 and LEDs     |
-
+```
 ---
 
 ## **LED Feedback**
@@ -130,17 +131,19 @@ rfid-smartcard-reader/
 ## **Example Output**
 
 When a card is detected and sector 8 is read, the script will print the following output:
+```
 Card detected!
 Card UID: 4A3B2C1D
 Authentication successful!
 Password retrieved from sector 8: mypassword123
-
+```
 If sector 8 is empty or blank, the script will print:
+```
 Card detected!
 Card UID: 4A3B2C1D
 Authentication successful!
 Password empty.
-
+```
 ---
 
 ## **Troubleshooting**
