@@ -216,18 +216,9 @@ class MFRC522:
         return self.OK if (stat == self.OK) and (bits == 0x18) else self.ERR
 
     def auth(self, mode, addr, sect, ser):
-        # Ensure sect and ser are lists of bytes
-        if isinstance(sect, str):
-            sect = [ord(c) for c in sect]  # Convert string to list of bytes
-        if isinstance(ser, str):
-            ser = [ord(c) for c in ser]  # Convert string to list of bytes
-
-        # Concatenate the lists
-        data = [mode, addr] + sect + ser[:4]
-        return self._tocard(0x0E, data)[0]
+        return self._tocard(0x0E, [mode, addr] + sect + ser[:4])[0]
 
     def stop_crypto1(self):
-
         self._cflags(0x08, 0x08)
 
     def read(self, addr):
@@ -306,7 +297,7 @@ class MFRC522:
         buf.append(pOut[0])
         buf.append(pOut[1])
         (status, backData, backLen) = self._tocard(0x0C, buf)
-        
+
         if (status == self.OK) and (backLen == 0x18):
             return  1
         else:
@@ -344,7 +335,7 @@ class MFRC522:
         """
         # Use the SelectTagSN method to get the UID
         status, uid = self.SelectTagSN()
-        
+
         if status == self.OK:
             return uid  # Return the UID if successful
         else:

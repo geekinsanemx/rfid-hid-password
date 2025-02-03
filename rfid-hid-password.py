@@ -20,11 +20,11 @@ rfid = MFRC522(sck, mosi, miso, rst, cs)
 kbd = Keyboard(usb_hid.devices)
 
 # Initialize LEDs
-red_led = digitalio.DigitalInOut(board.GP5)
+red_led = digitalio.DigitalInOut(board.GP27)
 red_led.direction = digitalio.Direction.OUTPUT
-green_led = digitalio.DigitalInOut(board.GP6)
+green_led = digitalio.DigitalInOut(board.GP28)
 green_led.direction = digitalio.Direction.OUTPUT
-blue_led = digitalio.DigitalInOut(board.GP7)
+blue_led = digitalio.DigitalInOut(board.GP29)
 blue_led.direction = digitalio.Direction.OUTPUT
 
 # Turn off LEDs initially
@@ -145,11 +145,11 @@ def type_string(text):
     for char in text:
         if char in ascii_to_keycode:
             keycode = ascii_to_keycode[char]
-            
+
             # Handle Shift key for uppercase letters and special characters
             if char.isupper() or char in '!@#$%^&*()_+{}|:"<>?~':
                 kbd.press(Keycode.SHIFT)  # Press Shift key
-            
+
             kbd.press(keycode)  # Press the key
             kbd.release_all()   # Release all keys
         else:
@@ -161,11 +161,11 @@ def load_default_key(file_path):
         with open(file_path, 'r') as file:
             data = json.load(file)
             return data.get('default_key', [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
-        
+
     except:
         print(f"File {file_path} not found or invalid. Using default key.")
         return [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-    
+
 # Path to the JSON file containing the default key
 default_key_file = 'default_key.json'
 default_key = load_default_key(default_key_file)
@@ -183,19 +183,19 @@ while True:
     if status == rfid.OK:
         print("Card detected!")
         blue_led.value = True
-        
+
         # Get the UID of the card
         (status, raw_uid) = rfid.SelectTagSN()
-        
+
         if status == rfid.OK:
             uid_hex = ''.join('{:02X}'.format(x) for x in raw_uid)
-            
+
             print("Card UID:", uid_hex)
             print("  - tag type: 0x%02x" % tag_type)
 
             if rfid.IsNTAG():
                 print("Got NTAG{}".format(rfid.NTAG))
-                
+
                 data = rfid.read(8)
                 print(list(data))
 
@@ -221,7 +221,7 @@ while True:
                     # Add a newline after typing
                     kbd.press(Keycode.ENTER)
                     kbd.release_all()
-                    
+
                 else:
                     print("Invalid data in sector 8.")
                     print(uid_hex)
@@ -229,7 +229,7 @@ while True:
                     red_led.value = True
                     kbd.press(Keycode.ENTER)
                     kbd.release_all()
-                    
+
                 rfid.stop_crypto1()
             else:
                 (stat, tag_type) = rfid.request(rfid.REQIDL)
@@ -237,38 +237,38 @@ while True:
                     (stat, raw_uid) = rfid.SelectTagSN()
 
                     block_addr = 8
-                    
+
                     if rfid.auth(rfid.AUTHENT1A, block_addr, default_key, raw_uid) == rfid.OK:
                         print("Authentication successful!")
-                        
+
                         data = rfid.read(block_addr)
                         print(data)
-                        
+
                         if status == rfid.OK and data is not None:
                             password = ''.join(chr(byte) for byte in data if byte != 0)
-                            
+
                             if all(byte == 0 for byte in data):
                                 print("Password empty. Typing UID instead.")
                                 print(uid_hex)
                                 type_string(uid_hex)
                                 green_led.value = True
-                                
+
                             elif password.strip() == "":
                                 print("Password empty. Typing UID instead.")
                                 print(uid_hex)
                                 type_string(uid_hex)
                                 green_led.value = True
-                                
+
                             else:
                                 print("Password retrieved from sector 8:", password)
                                 print(password)
                                 type_string(password)
                                 green_led.value = True
-                            
+
                             # Add a newline after typing
                             kbd.press(Keycode.ENTER)
                             kbd.release_all()
-                            
+
                         else:
                             print("Invalid data in sector 8.")
                             print(uid_hex)
@@ -276,7 +276,7 @@ while True:
                             red_led.value = True
                             kbd.press(Keycode.ENTER)
                             kbd.release_all()
-                            
+
                     else:
                         print("Authentication failed. Typing UID instead.")
                         print(uid_hex)
@@ -284,11 +284,11 @@ while True:
                         red_led.value = True
                         kbd.press(Keycode.ENTER)
                         kbd.release_all()
-                        
+
                 rfid.stop_crypto1()
-                
+
         else:
             print("Failed to read card UID.")
             red_led.value = True
 
-    time.sleep(0.2)
+    time.sleep(1)

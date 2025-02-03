@@ -15,11 +15,11 @@ rst = board.GP1
 rfid = MFRC522(sck, mosi, miso, rst, cs)
 
 # Initialize LEDs
-red_led = digitalio.DigitalInOut(board.GP5)
+red_led = digitalio.DigitalInOut(board.GP27)
 red_led.direction = digitalio.Direction.OUTPUT
-green_led = digitalio.DigitalInOut(board.GP6)
+green_led = digitalio.DigitalInOut(board.GP28)
 green_led.direction = digitalio.Direction.OUTPUT
-blue_led = digitalio.DigitalInOut(board.GP7)
+blue_led = digitalio.DigitalInOut(board.GP29)
 blue_led.direction = digitalio.Direction.OUTPUT
 
 # Turn off LEDs initially
@@ -62,7 +62,7 @@ def calculate_crc(data):
 def prepare_password(password):
     # Encode the password to UTF-8 bytes
     password_bytes = password.encode('utf-8')
-    
+
     # If the password is longer than 16 bytes, truncate it
     print(f"password_size {len(password_bytes)}")
     if len(password_bytes) > 16:
@@ -70,7 +70,7 @@ def prepare_password(password):
     # If the password is shorter than 16 bytes, pad it with null bytes
     elif len(password_bytes) < 16:
         password_bytes = password_bytes.ljust(16, b'\x00')
-    
+
     return password_bytes
 
 def read_password_with_crc():
@@ -189,6 +189,11 @@ def read_password_with_crc():
 
 
 def write_password_with_crc(password):
+    # Turn off LEDs at the start of each loop
+    red_led.value = False
+    green_led.value = False
+    blue_led.value = False
+
     # Convert password to UTF-8 encoded bytes
     password_bytes = prepare_password(password)
 
@@ -198,7 +203,7 @@ def write_password_with_crc(password):
 
     # Print the password in text and bytes format
     print("Password to write (text):", password)
-    print("Password to write (bytes):", password_bytes)
+    print("Password to write (bytes):", list(password_bytes))
 
     # Wait for user confirmation
     confirmation = input("Confirm writing the password? (yes/no): ").strip().lower()
@@ -208,11 +213,6 @@ def write_password_with_crc(password):
 
     # Main loop
     print("Waiting for RFID/NFC card to write password and CRC...")
-    
-    # Turn off LEDs at the start of each loop
-    red_led.value = False
-    green_led.value = False
-    blue_led.value = False
 
     # Scan for cards
     rfid.init()
@@ -311,6 +311,8 @@ def write_password_with_crc(password):
             print("Failed to read card UID.")
             red_led.value = True
 
+        time.sleep(1)
+
 
 # Main logic
 def manage_password(password_to_store):
@@ -333,6 +335,11 @@ def manage_password(password_to_store):
         else:
             print("Failed to write the password.")
 
+    time.sleep(1)
+    red_led.value = False
+    green_led.value = False
+    blue_led.value = False
+
 # Example usage
-password_to_store = "mypassword123"  # Change this to your desired password (max 16 characters)
+password_to_store = "MyPassw0rd123456"  # Change this to your desired password (max 16 characters)
 manage_password(password_to_store)
