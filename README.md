@@ -5,28 +5,31 @@ This project demonstrates how to use an **RP2040-Zero** microcontroller to read 
 ---
 
 ## **Project Structure**
-```
 rfid-smartcard-reader/
+├── default_key.json
 ├── examples
-│   ├── example-read-improved.py
-│   ├── example-read-mfc.py
-│   ├── example-read-ntag.py
-│   ├── example-read.py
-│   └── example-store-big-password.py
+│ ├── example-read.py
+│ ├── mfc
+│ │ └── example-read-mfc.py
+│ ├── ntag
+│ │ └── example-read-ntag.py
+│ ├── test-gpio-leds.py
+│ └── test-rfid-hid-input.py
 ├── lib
-│   ├── adafruit_hid
-│   └── mfrc522.py
+│ ├── adafruit_hid
+│ └── mfrc522.py
 ├── LICENSE
 ├── README.md
 ├── rfid-hid-password.py
 └── utils
-    ├── clear_rfid_password.py
-    ├── dump-rfid-smartcard.py
-    ├── rfid-password-manager.py
-    └── smartcard_dump.py
-
-```
-
+├── clear-rfid-password.py
+├── mfc
+│ ├── mfc-dump-rfid-smartcard.py
+│ └── mfc-store-big-password.py
+├── ntag
+│ └── ntag-dump-rfid-smartcard.py
+├── store-rfid-password.py
+└── validate-key-file.py
 
 ---
 
@@ -41,9 +44,9 @@ rfid-smartcard-reader/
 | **GP4**         | MISO        | -             | SPI Master In Slave Out         |
 | **GP0**         | SDA (CS)    | -             | SPI Chip Select                 |
 | **GP1**         | RST         | -             | Reset Pin                       |
-| **GP5**         | -           | Red LED       | Feedback LED for errors         |
-| **GP6**         | -           | Green LED     | Feedback LED for success        |
-| **GP7**         | -           | Blue LED      | Feedback LED for device on      |
+| **GP27**        | -           | Red LED       | Feedback LED for errors         |
+| **GP28**        | -           | Green LED     | Feedback LED for success        |
+| **GP29**        | -           | Blue LED      | Feedback LED for device on      |
 | **3.3V**        | 3.3V        | -             | Power for MFRC522 and LEDs      |
 | **GND**         | GND         | GND           | Ground for MFRC522 and LEDs     |
 
@@ -60,6 +63,9 @@ rfid-smartcard-reader/
     - Invalid data in sector 8.
     - Empty or blank password.
     - Failure to read the card UID.
+
+- **Blue LED**:
+  - Turns on when the device is powered on and ready.
 
 ---
 
@@ -87,15 +93,14 @@ rfid-smartcard-reader/
 
 1. **Install CircuitPython**:
    - Download and install CircuitPython on your RP2040-Zero from the [official website](https://circuitpython.org/board/waveshare_rp2040_zero/).
-   - Download and install additional libraries for CircuitPython on your RP2040-Zero from the [official website](https://circuitpython.org/libraries).
-   - Library mfrc522.py is based in this project which provide a modified version of mfrc522 library from MycroPython for CircuitPython [domdfcoding/circuitpython-mfrc522](https://github.com/domdfcoding/circuitpython-mfrc522/blob/master/mfrc522.py).
-     - also added very useful functions from this other mfrc522.py project from MycroPython []().
 
 2. **Install Required Libraries**:
-   - Copy the `adafruit_hid` and `mfrc522.py` libraries to the `lib` folder on your RP2040-Zero.
+   - Download the [CircuitPython Library Bundle](https://circuitpython.org/libraries).
+   - Copy the `adafruit_hid` library to the `lib` folder on your RP2040-Zero.
+   - Use the modified `mfrc522.py` library provided in this project, which is based on [domdfcoding/circuitpython-mfrc522](https://github.com/domdfcoding/circuitpython-mfrc522/blob/master/mfrc522.py).
 
 3. **Upload the Code**:
-   - Copy the `code.py` file to the root of your RP2040-Zero.
+   - Copy the `rfid-hid-password.py` file to the root of your RP2040-Zero.
 
 4. **Connect the Hardware**:
    - Connect the MFRC522 module and LEDs to the RP2040-Zero as described in the pin connections table.
@@ -118,25 +123,23 @@ rfid-smartcard-reader/
 4. **LED Feedback**:
    - The green LED will turn on for successful operations.
    - The red LED will turn on for errors or failures.
+   - The blue LED indicates the device is powered on and ready.
 
 ---
 
 ## **Example Output**
-```
+
 When a card is detected and sector 8 is read, the script will print the following output:
 Card detected!
 Card UID: 4A3B2C1D
 Authentication successful!
 Password retrieved from sector 8: mypassword123
-```
 
 If sector 8 is empty or blank, the script will print:
-```
 Card detected!
 Card UID: 4A3B2C1D
 Authentication successful!
 Password empty.
-```
 
 ---
 
@@ -158,7 +161,7 @@ Password empty.
 
 ## **License**
 
-This project is licensed under the GNU GENERAL PUBLIC LICENSE. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the **GNU GENERAL PUBLIC LICENSE**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -166,7 +169,7 @@ This project is licensed under the GNU GENERAL PUBLIC LICENSE. See the [LICENSE]
 
 - [Adafruit CircuitPython](https://circuitpython.org/) for the HID library.
 - [MFRC522 Library](https://github.com/wendlers/micropython-mfrc522) for RFID communication.
-- [domdfcoding/circuitpython-mfrc522](https://github.com/domdfcoding/circuitpython-mfrc522).
+- [domdfcoding/circuitpython-mfrc522](https://github.com/domdfcoding/circuitpython-mfrc522) for the modified MFRC522 library.
 
 ---
 
