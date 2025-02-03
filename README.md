@@ -146,7 +146,7 @@ If sector 8 is empty or blank, the script will print:
 Card detected!
 Card UID: 4A3B2C1D
 Authentication successful!
-Password empty.
+Password empty. Typing UID instead.
 ```
 ---
 
