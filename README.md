@@ -223,6 +223,7 @@ Password empty. Typing UID instead.
 * store password bigger than 16 chars, use multiple blocks for store/reading
 * add interactive button to change reading/typing mode to create/store password mode (to create new tags)
 * add an MFA mechanism
+* use different sectors to store different passwords, (find a way to specify which password to use)
 
 ---
 
