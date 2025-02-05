@@ -2,6 +2,8 @@
 
 This project demonstrates how to use an **RP2040-Zero** microcontroller to read data from an **MFRC522 RFID module** and simulate keyboard input using the `adafruit_hid` library. The project also includes feedback LEDs to indicate the status of the operation.
 
+![image](https://github.com/user-attachments/assets/f9915e8d-110c-4d38-8286-22f905c7ce35)
+
 ---
 
 ## **Project Structure**
