@@ -4,7 +4,7 @@ I wanted to store a big and secure password in a "secure way" and type it into t
 
 In theory, it's almost easy to store data into an RFID card or tag, but often the only possible way to use that info is in the application reader or specific purpose application, which in my case does not fit with the *enter luks password:* prompt to decrypt a partition, so I thought what I needed was a device to read the password from the RFID card/tag and type it into the computer as a keyboard, no matter what is on the screen, just type it ...
 
-I know the security implications of leaving the card/tag unprotected or lying around with physical access or reading for others. I'm thinking of implementing more secure ways to store the data on the card (avoiding others with physical access to obtain the password) and adding validation so you're the one and only one who is reading the password. Please refer to the [**Features pending to add**](#features-pending-to-add) and if you want and can contribute, you're welcome!! :)
+I know the security implications of leaving the card/tag unprotected or laying around with physical access or reading for others. I'm thinking of implementing more secure ways to store the data on the card (avoiding others with physical access to obtain the password) and adding validation so you're the one and only one who is reading the password. Please refer to the [**Features pending to add**](#features-pending-to-add) and if you want and can contribute, you're welcome!! :)
 
 This project demonstrates how to use an **RP2040-Zero** microcontroller to read data from an **MFRC522 RFID module** and simulate keyboard input using the `adafruit_hid` library. The project also includes feedback LEDs to indicate the status of the operation.
 
