@@ -222,6 +222,7 @@ Password empty. Typing UID instead.
 * password be stored encrypted using public/private key algoritm
 * store password bigger than 16 chars, use multiple blocks for store/reading
 * add interactive button to change reading/typing mode to create/store password mode (to create new tags)
+* add an MFA mechanism
 
 ---
 
