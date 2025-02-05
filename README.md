@@ -1,5 +1,9 @@
 # RFID Smartcard Reader with RP2040-Zero
 
+I wanted to store big and secure password in a "secure way" and type it into the computer... but 16 or more special chars??, so I was thinking into store the password into an RFID card and used as a password, on my need to encrypt/decrypt/open a luks partitions, etc. 
+
+in theory it's almost easy to store data into a RFID card or tag, but often you have and only possible to use that info in the application reader or specific purpouse application, which in my case do not fit with the enter `luks password` prompt to decrypt a partition, so I though what I need is a device read the password from the RFID card/tag and type it into the computer as a keyboard, no matter was is in the screen, just type it ...
+
 This project demonstrates how to use an **RP2040-Zero** microcontroller to read data from an **MFRC522 RFID module** and simulate keyboard input using the `adafruit_hid` library. The project also includes feedback LEDs to indicate the status of the operation.
 
 ![image](https://github.com/user-attachments/assets/f9915e8d-110c-4d38-8286-22f905c7ce35)
@@ -208,6 +212,14 @@ Password empty. Typing UID instead.
 
 4. **Multiple Reads**:
    - Increase the `time.sleep(1)` delay in the script if it reads the same card multiple times.
+
+---
+
+## **Features pending to add**
+* password be stored encrypted and use the tag uid as encryption key in this way even if card data is cloned in another card, cannot be decrypted
+* password be stored encrypted using public/private key algoritm
+* store password bigger than 16 chars, use multiple blocks for store/reading
+* add interactive button to change reading/typing mode to create/store password mode (to create new tags)
 
 ---
 
