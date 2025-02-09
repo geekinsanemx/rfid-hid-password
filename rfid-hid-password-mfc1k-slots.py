@@ -5,6 +5,7 @@ from mfrc522 import MFRC522
 import usb_hid
 from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keycode import Keycode
+import json
 
 # Define SPI pins for RP2040-Zero
 sck = board.GP2
@@ -170,6 +171,82 @@ def load_default_key(file_path):
 default_key_file = 'default_key.json'
 default_key = load_default_key(default_key_file)
 
+# CRC-16 checksum calculation
+def calculate_crc(data):
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte << 8
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = (crc << 1) ^ 0x1021
+            else:
+                crc <<= 1
+            crc &= 0xFFFF
+    return crc
+
+# Function to read password from a specific slot
+def read_password_from_slot(slot, raw_uid):
+    sector = slot  # Slot 1 = Sector 1, Slot 2 = Sector 2, ..., Slot 15 = Sector 15
+    block1 = sector * 4  # First block of the sector
+    block2 = sector * 4 + 1  # Second block of the sector
+    block3 = sector * 4 + 2  # Third block of the sector (length + CRC)
+
+    # Authenticate with the default key for the sector
+    if rfid.auth(rfid.AUTHENT1A, block1, default_key, raw_uid) == rfid.OK:
+        print(f"Authentication for sector {sector} successful!")
+
+        # Read block 1 (first 16 bytes of password)
+        data1 = rfid.read(block1)
+        if data1 is None:
+            print(f"Failed to read block 1 from sector {sector}.")
+            return None
+
+        # Read block 2 (next 16 bytes of password, if any)
+        data2 = rfid.read(block2)
+        if data2 is None:
+            print(f"Failed to read block 2 from sector {sector}.")
+            return None
+
+        # Read block 3 (password length + CRC)
+        data3 = rfid.read(block3)
+        if data3 is None:
+            print(f"Failed to read block 3 from sector {sector}.")
+            return None
+
+        # Extract CRC and password length from block 3
+        stored_crc = (data3[0] << 8) | data3[1]  # First two bytes: CRC
+        password_len = (data3[2] << 8) | data3[3]  # Next two bytes: password length
+
+        # Combine password data from block 1 and block 2
+        password_bytes = bytes(data1) + bytes(data2)
+        password_bytes = password_bytes[:password_len]  # Trim to actual password length
+
+        # Calculate CRC for the password
+        calculated_crc = calculate_crc(password_bytes)
+
+        # Debugging: Print the stored and calculated CRC
+        print(f"Stored CRC: {stored_crc:04X}")
+        print(f"Calculated CRC: {calculated_crc:04X}")
+
+        # Verify CRC
+        if stored_crc == calculated_crc:
+            # Decode the password from UTF-8 bytes
+            password = password_bytes.decode('utf-8')
+            print(f"Password retrieved from slot {slot} (sector {sector}): {password}")
+            return password
+        else:
+            print(f"CRC verification failed for slot {slot} (sector {sector}). Data may be corrupted.")
+            return None
+    else:
+        print(f"Authentication for sector {sector} failed.")
+        return None
+
+# Card presence tracking
+card_present = False  # Flag to track if a card is currently on the sensor
+last_card_uid = None  # Store the last detected card UID
+debounce_time = 10.0  # Debounce delay in seconds
+last_detection_time = 0  # Timestamp of the last card detection
+
 # Main loop
 print("Waiting for RFID/NFC card...")
 while True:
@@ -180,115 +257,63 @@ while True:
 
     # Scan for cards
     (status, tag_type) = rfid.request(rfid.REQIDL)
-    if status == rfid.OK:
-        print("Card detected!")
-        blue_led.value = True
 
+    if status == rfid.OK:
         # Get the UID of the card
         (status, raw_uid) = rfid.SelectTagSN()
 
         if status == rfid.OK:
             uid_hex = ''.join('{:02X}'.format(x) for x in raw_uid)
 
-            print("Card UID:", uid_hex)
-            print("  - tag type: 0x%02x" % tag_type)
+            # Check if the card is new or the same as the last one
+            if uid_hex != last_card_uid or (time.monotonic() - last_detection_time) > debounce_time:
+                print("Card detected!")
+                card_present = True
+                last_card_uid = uid_hex
+                last_detection_time = time.monotonic()
 
-            if rfid.IsNTAG():
-                print("Got NTAG{}".format(rfid.NTAG))
+                print("Card UID:", uid_hex)
+                print("  - tag type: 0x%02x" % tag_type)
 
-                data = rfid.read(8)
-                print(list(data))
+                # Prompt user to select a slot to read from
+                try:
+                    slot = int(input("Enter the slot number to read (1-15): "))
+                    if slot < 1 or slot > 15:
+                        print("Invalid slot number. Please enter a number between 1 and 15.")
+                        continue
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+                    continue
 
-                if status == rfid.OK and data is not None:
-                    password = ''.join(chr(byte) for byte in data if byte != 0)
-
-                    if list(data) == [0] * 16:  # Check if the block is empty
-                        print("Password empty. Typing UID instead.")
-                        print(uid_hex)
-                        type_string(uid_hex)
-                        green_led.value = True
-                    elif password.strip() == "":
-                        print("Password empty. Typing UID instead.")
-                        print(uid_hex)
-                        type_string(uid_hex)
-                        green_led.value = True
-                    else:
-                        print("Password retrieved from sector 8:", password)
-                        print(password)
-                        type_string(password)
-                        green_led.value = True
-
-                    # Add a newline after typing
-                    kbd.press(Keycode.ENTER)
-                    kbd.release_all()
-
+                # Read password from the selected slot
+                password = read_password_from_slot(slot, raw_uid)
+                if password:
+                    print("Password retrieved:", password)
+                    type_string(password)
+                    green_led.value = True
                 else:
-                    print("Invalid data in sector 8.")
-                    print(uid_hex)
-                    type_string(uid_hex)
+                    print("Failed to read password from slot.", slot)
                     red_led.value = True
-                    kbd.press(Keycode.ENTER)
-                    kbd.release_all()
+
+                # Add a newline after typing
+                kbd.press(Keycode.ENTER)
+                kbd.release_all()
 
                 rfid.stop_crypto1()
+
             else:
-                (stat, tag_type) = rfid.request(rfid.REQIDL)
-                if stat == rfid.OK:
-                    (stat, raw_uid) = rfid.SelectTagSN()
-
-                    block_addr = 8
-
-                    if rfid.auth(rfid.AUTHENT1A, block_addr, default_key, raw_uid) == rfid.OK:
-                        print("Authentication successful!")
-
-                        data = rfid.read(block_addr)
-                        print(data)
-
-                        if status == rfid.OK and data is not None:
-                            password = ''.join(chr(byte) for byte in data if byte != 0)
-
-                            if all(byte == 0 for byte in data):
-                                print("Password empty. Typing UID instead.")
-                                print(uid_hex)
-                                type_string(uid_hex)
-                                green_led.value = True
-
-                            elif password.strip() == "":
-                                print("Password empty. Typing UID instead.")
-                                print(uid_hex)
-                                type_string(uid_hex)
-                                green_led.value = True
-
-                            else:
-                                print("Password retrieved from sector 8:", password)
-                                print(password)
-                                type_string(password)
-                                green_led.value = True
-
-                            # Add a newline after typing
-                            kbd.press(Keycode.ENTER)
-                            kbd.release_all()
-
-                        else:
-                            print("Invalid data in sector 8.")
-                            print(uid_hex)
-                            type_string(uid_hex)
-                            red_led.value = True
-                            kbd.press(Keycode.ENTER)
-                            kbd.release_all()
-
-                    else:
-                        print("Authentication failed. Typing UID instead.")
-                        print(uid_hex)
-                        type_string(uid_hex)
-                        red_led.value = True
-                        kbd.press(Keycode.ENTER)
-                        kbd.release_all()
-
-                rfid.stop_crypto1()
+                # Card is still present, but we've already processed it
+                pass
 
         else:
             print("Failed to read card UID.")
             red_led.value = True
 
-    time.sleep(1)
+    else:
+        if card_present and (time.monotonic() - last_detection_time) > debounce_time:
+            # Card is no longer detected
+            print("Card removed.")
+            card_present = False
+            last_card_uid = None
+
+    time.sleep(0.1)  # Small delay to reduce CPU usage

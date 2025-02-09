@@ -31,6 +31,11 @@ class MFRC522:
     AUTHENT1A = 0x60
     AUTHENT1B = 0x61
 
+    NTAG_213 = 213
+    NTAG_215 = 215
+    NTAG_216 = 216
+    NTAG_NONE = 0
+
     PICC_ANTICOLL1 = 0x93
     PICC_ANTICOLL2 = 0x95
     PICC_ANTICOLL3 = 0x97
@@ -44,6 +49,9 @@ class MFRC522:
 
         self.rst.value = 0
         self.rst.value = 1
+
+        self.NTAG = 0
+        self.NTAG_MaxPage = 0
 
         self.spi = busio.SPI(sck, MOSI=mosi, MISO=miso)
         self.spi_device = SPIDevice(self.spi, self.cs)
@@ -238,6 +246,44 @@ class MFRC522:
                 stat = self.ERR
 
         return stat
+
+    def write_block_ntag(self, page, data):
+        """
+        Write data to a specific page on an NTAG213 tag.
+        :param page: The page address to write to (0 to 44 for NTAG213).
+        :param data: The data to write (4 bytes).
+        :return: True if successful, False otherwise.
+        """
+        if page < 0 or page > 44:
+            print(f"Invalid page address: {page}. Must be between 0 and 44.")
+            return False
+
+        # NTAG213 requires 4 bytes of data per page
+        if len(data) != 4:
+            print("Data must be exactly 4 bytes.")
+            return False
+
+        # Write the data to the specified page
+        status = self.write(page, data)
+        return status == self.OK
+
+    def read_block_ntag(self, page):
+        """
+        Read data from a specific page on an NTAG213 tag.
+        :param page: The page address to read from (0 to 44 for NTAG213).
+        :return: The data read (4 bytes), or None if the address is invalid.
+        """
+        if page < 0 or page > 44:
+            print(f"Invalid page address: {page}. Must be between 0 and 44.")
+            return None
+
+        # Read the data from the specified page
+        data = self.read(page)
+        if data is None:
+            print("Failed to read data from the tag.")
+            return None
+
+        return data
 
     def set_antenna_gain(self, gain: int):
         """
@@ -446,3 +492,130 @@ class MFRC522:
             return self.ERR
 
         return self.OK
+
+    def MFRC522_Dump_NTAG(self, Start=0, End=135):
+        for absoluteBlock in range(Start, End, 4):
+            MaxIndex = 4 * 135
+            status = self.OK
+            print("Page {:02d}: ".format(absoluteBlock), end="")
+            if status == self.OK:
+                block = self.read(absoluteBlock)
+                if status == self.ERR:
+                    break
+
+                else:
+                    Index = absoluteBlock*4
+
+                    for i in range(len(block)):
+                        if Index < MaxIndex :
+                           print("{:02X} ".format(block[i]), end="")
+
+                        else:
+                           print("   ", end="")
+
+                        if (i%4)==3:
+                           print(" ", end="")
+
+                        Index+=1
+                    print("  ", end="")
+
+                    Index = absoluteBlock*4
+
+                    for value in block:
+                        if Index < MaxIndex:
+                            if (value > 0x20) and (value < 0x7f):
+                                print(chr(value), end="")
+                            else:
+                                print('.',end="")
+
+                        Index+=1
+                    print("")
+            else:
+                break
+
+        if status == self.ERR:
+            print("Authentication error")
+            return self.ERR
+
+        return self.OK
+
+    def writeNTAGPage(self, page, data):
+        if page > self.NTAG_MaxPage:
+            return self.ERR
+
+        if page < 4:
+            return self.ERR
+
+        if len(data) != 4:
+            return self.ERR
+
+        return self.write(page, data+[0]*12)
+
+    def readNTAGPage(self, page):
+        """
+        Read data from a specific page on an NTAG213 tag.
+        :param page: The page address to read from (0 to 44 for NTAG213).
+        :return: The data read (4 bytes), or None if the address is invalid.
+        """
+        if page < 0 or page > 44:
+            print(f"Invalid page address: {page}. Must be between 0 and 44.")
+            return None
+
+        # Read the data from the specified page
+        data = self.read(page)
+        if data is None:
+            print("Failed to read data from the tag.")
+            return None
+
+        return data
+
+    def getNTAGVersion(self):
+         buf = [0x60]
+         buf += self._crc(buf)
+         stat, recv, _ = self._tocard(0x0C, buf)
+         return stat, recv
+
+    #Version NTAG213 = [0x0 ,0x4, 0x4, 0x2, 0x1, 0x0,0x0f, 0x3]
+    #Version NTAG215 = [0x0 ,0x4, 0x4, 0x2, 0x1, 0x0,0x11, 0x3]
+    #Version NTAG216 = [0x0 ,0x4, 0x4, 0x2, 0x1, 0x0,0x13, 0x3]
+
+    def IsNTAG(self):
+        self.NTAG = self.NTAG_NONE
+        self.NTAG_MaxPage=0
+        (stat, rcv) = self.getNTAGVersion()
+
+        if stat == self.OK:
+            if len(rcv) < 8:
+                return False  #do we have at least 8 bytes
+
+            if rcv[0] != 0:
+                return False  #check header
+
+            if rcv[1] != 4:
+                return False  #check Vendor ID
+
+            if rcv[2] != 4:
+                return False  #check product type
+
+            if rcv[3] != 2:
+                return False  #check subtype
+
+            if rcv[7] != 3:
+                return False  #check protocol
+
+            if rcv[6] == 0xf:
+                self.NTAG= self.NTAG_213
+                self.NTAG_MaxPage = 44
+                return True
+
+            if rcv[6] == 0x11:
+                self.NTAG= self.NTAG_215
+                self.NTAG_MaxPage = 134
+                return True
+
+            if rcv[7] == 0x13:
+                self.NTAG= self.NTAG_216
+                self.NTAG_MaxPage = 230
+                return True
+
+        return False
