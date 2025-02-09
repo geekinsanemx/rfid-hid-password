@@ -6,6 +6,7 @@ import usb_hid
 from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keycode import Keycode
 import json
+import binascii
 
 # Define SPI pins for RP2040-Zero
 sck = board.GP2
@@ -171,11 +172,105 @@ def load_default_key(file_path):
 default_key_file = 'default_key.json'
 default_key = load_default_key(default_key_file)
 
+# Global variable to select the default sector/slot
+DEFAULT_SECTOR = 1  # Default to sector 1
+
 # Card presence tracking
 card_present = False  # Flag to track if a card is currently on the sensor
 last_card_uid = None  # Store the last detected card UID
 debounce_time = 10.0  # Debounce delay in seconds
 last_detection_time = 0  # Timestamp of the last card detection
+
+# CRC-16 checksum calculation
+def calculate_crc(data):
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte << 8
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = (crc << 1) ^ 0x1021
+            else:
+                crc <<= 1
+            crc &= 0xFFFF
+    return crc
+
+def read_password_from_sector(sector):
+    """Read password from the specified sector."""
+    block_addr = sector * 4  # Each sector has 4 blocks
+    password_blocks = [block_addr, block_addr + 1]
+    crc_block = block_addr + 2
+
+    password_data = []
+    for block in password_blocks:
+        data = rfid.read(block)
+        if data is not None:
+            password_data.extend(data)
+
+    crc_data = rfid.read(crc_block)
+    if crc_data is not None:
+        stored_crc = (crc_data[0] << 8) | crc_data[1]  # First two bytes: CRC
+        password_len = (crc_data[2] << 8) | crc_data[3]  # Next two bytes: password length
+
+        # Verify CRC
+        calculated_crc = calculate_crc(bytes(password_data[:password_len]))
+        if calculated_crc == stored_crc:
+            return ''.join(chr(byte) for byte in password_data[:password_len])
+        else:
+            print("CRC mismatch. Password may be corrupted.")
+            return None
+    else:
+        print("Failed to read CRC block.")
+        return None
+
+def validate_stored_password(sector, raw_uid):
+    """Validate the stored password using its CRC."""
+    # Read the password blocks back
+    block1 = sector * 4
+    block2 = sector * 4 + 1
+    block3 = sector * 4 + 2
+
+    if rfid.auth(rfid.AUTHENT1A, block1, default_key, raw_uid) == rfid.OK:
+        # Read block 1 (first 16 bytes of password)
+        data1 = rfid.read(block1)
+        if data1 is None:
+            print(f"Failed to read block 1 from sector {sector}.")
+            return False
+
+        # Read block 2 (next 16 bytes of password, if any)
+        data2 = rfid.read(block2)
+        if data2 is None:
+            print(f"Failed to read block 2 from sector {sector}.")
+            return False
+
+        # Read block 3 (CRC + password length)
+        data3 = rfid.read(block3)
+        if data3 is None:
+            print(f"Failed to read block 3 from sector {sector}.")
+            return False
+
+        # Extract CRC and password length from block 3
+        stored_crc = (data3[0] << 8) | data3[1]  # First two bytes: CRC
+        password_len = (data3[2] << 8) | data3[3]  # Next two bytes: password length
+
+        # Combine password data from block 1 and block 2
+        password_bytes = bytes(data1) + bytes(data2)
+        password_bytes = password_bytes[:password_len]  # Trim to actual password length
+
+        # Calculate CRC for the password
+        calculated_crc = calculate_crc(password_bytes)
+
+        # Verify CRC
+        if stored_crc == calculated_crc:
+            print(f"Password validation successful! CRC matched: {stored_crc:04X}")
+            return True
+        else:
+            print(f"Password validation failed. Data may be corrupted.")
+            print(f"Stored CRC: {stored_crc:04X}")
+            print(f"Calculated CRC: {calculated_crc:04X}")
+            return False
+    else:
+        print(f"Authentication for sector {sector} failed.")
+        return False
 
 # Main loop
 print("Waiting for RFID/NFC card...")
@@ -205,50 +300,33 @@ while True:
                 print("Card UID:", uid_hex)
                 print("  - tag type: 0x%02x" % tag_type)
 
-                block_addr = 8
-
-                if rfid.auth(rfid.AUTHENT1A, block_addr, default_key, raw_uid) == rfid.OK:
+                if rfid.auth(rfid.AUTHENT1A, DEFAULT_SECTOR * 4, default_key, raw_uid) == rfid.OK:
                     print("Authentication successful!")
 
-                    data = rfid.read(block_addr)
-                    print(data)
+                    password = read_password_from_sector(DEFAULT_SECTOR)
+                    if password:
+                        print("Password retrieved from sector", DEFAULT_SECTOR, ":", password)
 
-                    if status == rfid.OK and data is not None:
-                        password = ''.join(chr(byte) for byte in data if byte != 0)
-
-                        if all(byte == 0 for byte in data):
-                            print("Password empty. Typing UID instead.")
-                            print(uid_hex)
-                            type_string(uid_hex)
-                            blue_led.value = True
-
-                        elif password.strip() == "":
-                            print("Password empty. Typing UID instead.")
-                            print(uid_hex)
-                            type_string(uid_hex)
-                            blue_led.value = True
-
-                        else:
-                            print("Password retrieved from sector 8:", password)
-                            print(password)
+                        # Validate the password using its CRC
+                        if validate_stored_password(DEFAULT_SECTOR, raw_uid):
+                            print("Password is valid. Typing password...")
                             type_string(password)
                             green_led.value = True
-
-                        # Add a newline after typing
-                        kbd.press(Keycode.ENTER)
-                        kbd.release_all()
-
+                        else:
+                            print("Password validation failed. Typing UID instead.")
+                            type_string(uid_hex)
+                            blue_led.value = True
                     else:
-                        print("Invalid data in sector 8.")
-                        print(uid_hex)
+                        print("Failed to read password. Typing UID instead.")
                         type_string(uid_hex)
-                        red_led.value = True
-                        kbd.press(Keycode.ENTER)
-                        kbd.release_all()
+                        blue_led.value = True
+
+                    # Add a newline after typing
+                    kbd.press(Keycode.ENTER)
+                    kbd.release_all()
 
                 else:
                     print("Authentication failed. Typing UID instead.")
-                    print(uid_hex)
                     type_string(uid_hex)
                     blue_led.value = True
                     kbd.press(Keycode.ENTER)
