@@ -155,41 +155,60 @@ def clear_sectors():
             print("Sectors in use (can be cleared):")
             for sector in in_use_sectors:
                 print(f"  Slot {sector} (Sector {sector})")
+            print("  Option: all")
 
             # Prompt user to select a slot to clear
-            try:
-                slot = int(input("Enter the slot number to clear (1-15): "))
-                if slot < 1 or slot > 15:
-                    print("Invalid slot number. Please enter a number between 1 and 15.")
-                    return
-                if slot not in in_use_sectors:
-                    print("Selected slot is empty or invalid. Please choose a sector from the list above.")
-                    return
-            except ValueError:
-                print("Invalid input. Please enter a number.")
-                return
+            user_input = input("Enter the slot number to clear (1-15) or 'all' to clear all sectors: ").strip().lower()
 
-            # Read and display data from the selected sector
-            sector_data = read_sector_data(slot, raw_uid)
-            if sector_data:
-                password, stored_crc = sector_data
-                print(f"Stored Password: {password}")
-                print(f"Stored CRC: {stored_crc:04X}")
-
-                # Ask for confirmation before clearing
-                confirmation = input("Are you sure you want to clear this sector? (yes/no): ").strip().lower()
-                if confirmation == "yes":
-                    # Clear the sector
-                    if clear_sector(slot, raw_uid):
-                        print(f"Sector {slot} cleared successfully!")
-                        green_led.value = True
+            if user_input == "all":
+                # Clear all sectors
+                for sector in range(1, 16):
+                    if sector in in_use_sectors:
+                        print(f"Clearing sector {sector}...")
+                        if clear_sector(sector, raw_uid):
+                            print(f"Sector {sector} cleared successfully!")
+                            green_led.value = True
+                        else:
+                            print(f"Failed to clear sector {sector}.")
+                            red_led.value = True
                     else:
-                        print(f"Failed to clear sector {slot}.")
-                        red_led.value = True
-                else:
-                    print("Clear operation cancelled.")
+                        print(f"Sector {sector} is empty or invalid. Skipping...")
+                return
             else:
-                print(f"No valid data found in slot {slot} (sector {slot}).")
+                try:
+                    slot = int(user_input)
+                    if slot < 1 or slot > 15:
+                        print("Invalid slot number. Please enter a number between 1 and 15.")
+                        return
+                    if slot not in in_use_sectors:
+                        print("Selected slot is empty or invalid. Please choose a sector from the list above.")
+                        return
+
+                    # Read and display data from the selected sector
+                    sector_data = read_sector_data(slot, raw_uid)
+                    if sector_data:
+                        password, stored_crc = sector_data
+                        print(f"Stored Password: {password}")
+                        print(f"Stored CRC: {stored_crc:04X}")
+
+                        # Ask for confirmation before clearing
+                        confirmation = input("Are you sure you want to clear this sector? (yes/no): ").strip().lower()
+                        if confirmation == "yes":
+                            # Clear the sector
+                            if clear_sector(slot, raw_uid):
+                                print(f"Sector {slot} cleared successfully!")
+                                green_led.value = True
+                            else:
+                                print(f"Failed to clear sector {slot}.")
+                                red_led.value = True
+                        else:
+                            print("Clear operation cancelled.")
+                    else:
+                        print(f"No valid data found in slot {slot} (sector {slot}).")
+
+                except ValueError:
+                    print("Invalid input. Please enter a number or 'all'.")
+                    return
 
             rfid.stop_crypto1()
 
