@@ -8,13 +8,10 @@ def load_default_key(file_path):
     try:
         with open(file_path, 'r') as file:
             data = json.load(file)
-            print(json.dumps(data.get('default_key')))
-
             return data.get('default_key', [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
     except Exception as e:
         print(f"Error loading default key: {e}. Using default key.")
         return [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-
 
 def validate_default_key(default_key):
     """

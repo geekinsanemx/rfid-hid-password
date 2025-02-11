@@ -95,9 +95,9 @@ def dump_smartcard_data():
                         print("    Access Bits: {}".format(' '.join(['{:02X}'.format(byte) for byte in data[6:10]])))
                         print("    Key B: {}".format(' '.join(['{:02X}'.format(byte) for byte in data[10:16]])))
 
-                    # Identify password slots starting from sector 6 for slot 1
-                    if sector >= 5 and block == 0:  # Slot 1 = Sector 6, Slot 2 = Sector 7, etc.
-                        slot = sector - 5
+                    # Identify password slots starting from sector 1 for slot 1
+                    if sector >= 1 and block == 0:  # Slot 1 = Sector 1, Slot 2 = Sector 2, etc.
+                        slot = sector
                         print("  ** Password Slot {} **".format(slot))
                         if ascii_data:
                             print("    Password: {}".format(ascii_data))

@@ -151,6 +151,9 @@ def write_password_to_sector(password, sector, raw_uid):
     # Prepare the third block (CRC + password length)
     len_crc_block = crc_bytes + [password_len & 0xFF, (password_len >> 8) & 0xFF] + [0x00] * 12
 
+    # Convert len_crc_block to bytes
+    len_crc_block_bytes = bytes(len_crc_block)
+
     # Split the password into 16-byte blocks
     block1 = password_bytes[:16]
     block2 = password_bytes[16:32] if len(password_bytes) > 16 else []
@@ -164,6 +167,7 @@ def write_password_to_sector(password, sector, raw_uid):
     # Encrypt each block separately
     encrypted_block1 = encrypt_block(block1, encryption_key)
     encrypted_block2 = encrypt_block(block2, encryption_key) if block2 else b''
+    encrypted_len_crc_block = encrypt_block(len_crc_block_bytes, encryption_key)
 
     # Show CRC to be stored
     print(f"CRC to be stored: {crc:04X}")
@@ -185,7 +189,7 @@ def write_password_to_sector(password, sector, raw_uid):
                     return False
 
             # Write block 3 (CRC + password length)
-            if rfid.write(sector * 4 + 2, len_crc_block) == rfid.OK:
+            if rfid.write(sector * 4 + 2, list(encrypted_len_crc_block)) == rfid.OK:
                 print(f"Block 3 (CRC + length) written to sector {sector}.")
                 return True
             else:
@@ -227,13 +231,14 @@ def validate_stored_password(sector, raw_uid):
             print(f"Failed to read block 3 from sector {sector}.")
             return False
 
-        # Extract CRC and password length from block 3
-        stored_crc = (data3[0] << 8) | data3[1]  # First two bytes: CRC
-        password_len = (data3[2] << 8) | data3[3]  # Next two bytes: password length
-
         # Decrypt each block separately
         decrypted_block1 = decrypt_block(bytes(data1), encryption_key)
         decrypted_block2 = decrypt_block(bytes(data2), encryption_key) if data2 else b''
+        decrypted_len_crc_block = decrypt_block(bytes(data3), encryption_key)
+
+        # Extract CRC and password length from decrypted block 3
+        stored_crc = (decrypted_len_crc_block[0] << 8) | decrypted_len_crc_block[1]  # First two bytes: CRC
+        password_len = (decrypted_len_crc_block[2] << 8) | decrypted_len_crc_block[3]  # Next two bytes: password length
 
         # Combine decrypted blocks and trim to actual password length
         decrypted_password_bytes = decrypted_block1 + decrypted_block2

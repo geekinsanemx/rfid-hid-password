@@ -6,6 +6,7 @@ import usb_hid
 from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keycode import Keycode
 import json
+import aesio
 
 # Define SPI pins for RP2040-Zero
 sck = board.GP2
@@ -184,45 +185,65 @@ def calculate_crc(data):
             crc &= 0xFFFF
     return crc
 
-# Function to read password from a specific slot
+# Generate a 16-byte encryption key from the UID
+def generate_encryption_key(raw_uid):
+    # Pad the UID with zeros to make it 16 bytes
+    return b'\x00' * (16 - len(raw_uid)) + bytes(raw_uid)
+
+# Decrypt a single 16-byte block using AES ECB mode
+def decrypt_block(block, key):
+    cipher = aesio.AES(key, aesio.MODE_ECB)
+    decrypted_block = bytearray(16)
+    cipher.decrypt_into(block, decrypted_block)
+    return decrypted_block
+
+# Function to read and decrypt password from a specific slot
 def read_password_from_slot(slot, raw_uid):
     sector = slot  # Slot 1 = Sector 1, Slot 2 = Sector 2, ..., Slot 15 = Sector 15
     block1 = sector * 4  # First block of the sector
     block2 = sector * 4 + 1  # Second block of the sector
     block3 = sector * 4 + 2  # Third block of the sector (length + CRC)
 
+    # Generate the encryption key from the UID
+    encryption_key = generate_encryption_key(raw_uid)
+
     # Authenticate with the default key for the sector
     if rfid.auth(rfid.AUTHENT1A, block1, default_key, raw_uid) == rfid.OK:
         print(f"Authentication for sector {sector} successful!")
 
-        # Read block 1 (first 16 bytes of password)
+        # Read block 1 (first 16 bytes of encrypted password)
         data1 = rfid.read(block1)
         if data1 is None:
             print(f"Failed to read block 1 from sector {sector}.")
             return None
 
-        # Read block 2 (next 16 bytes of password, if any)
+        # Read block 2 (next 16 bytes of encrypted password, if any)
         data2 = rfid.read(block2)
         if data2 is None:
             print(f"Failed to read block 2 from sector {sector}.")
             return None
 
-        # Read block 3 (password length + CRC)
+        # Read block 3 (encrypted CRC + password length)
         data3 = rfid.read(block3)
         if data3 is None:
             print(f"Failed to read block 3 from sector {sector}.")
             return None
 
-        # Extract CRC and password length from block 3
-        stored_crc = (data3[0] << 8) | data3[1]  # First two bytes: CRC
-        password_len = (data3[2] << 8) | data3[3]  # Next two bytes: password length
+        # Decrypt each block separately
+        decrypted_block1 = decrypt_block(bytes(data1), encryption_key)
+        decrypted_block2 = decrypt_block(bytes(data2), encryption_key) if data2 else b''
+        decrypted_block3 = decrypt_block(bytes(data3), encryption_key)
 
-        # Combine password data from block 1 and block 2
-        password_bytes = bytes(data1) + bytes(data2)
-        password_bytes = password_bytes[:password_len]  # Trim to actual password length
+        # Extract CRC and password length from decrypted block 3
+        stored_crc = (decrypted_block3[0] << 8) | decrypted_block3[1]  # First two bytes: CRC
+        password_len = (decrypted_block3[2] << 8) | decrypted_block3[3]  # Next two bytes: password length
 
-        # Calculate CRC for the password
-        calculated_crc = calculate_crc(password_bytes)
+        # Combine decrypted password blocks and trim to actual password length
+        decrypted_password_bytes = decrypted_block1 + decrypted_block2
+        decrypted_password_bytes = decrypted_password_bytes[:password_len]
+
+        # Calculate CRC for the decrypted password
+        calculated_crc = calculate_crc(decrypted_password_bytes)
 
         # Debugging: Print the stored and calculated CRC
         print(f"Stored CRC: {stored_crc:04X}")
@@ -231,7 +252,7 @@ def read_password_from_slot(slot, raw_uid):
         # Verify CRC
         if stored_crc == calculated_crc:
             # Decode the password from UTF-8 bytes
-            password = password_bytes.decode('utf-8')
+            password = decrypted_password_bytes.decode('utf-8')
             print(f"Password retrieved from slot {slot} (sector {sector}): {password}")
             return password
         else:
@@ -285,7 +306,7 @@ while True:
                     print("Invalid input. Please enter a number.")
                     continue
 
-                # Read password from the selected slot
+                # Read and decrypt password from the selected slot
                 password = read_password_from_slot(slot, raw_uid)
                 if password:
                     print("Password retrieved:", password)

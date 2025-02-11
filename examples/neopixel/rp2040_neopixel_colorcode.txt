@@ -1,0 +1,15 @@
+On an RP2040 Zero with a NeoPixel, the color code for basic colors would be: 
+    red (255, 0, 0), 
+    green (0, 255, 0), 
+    blue (0, 0, 255), 
+    
+where each value within the parentheses represents the intensity of red, green, and blue respectively, with a range from 0 (off) to 255 (full brightness). 
+
+Key points about NeoPixel color codes:
+    RGB format: NeoPixels use the RGB color model, meaning each color is defined by its red, green, and blue components. 
+    Value range: Each color value can range from 0 to 255. 
+
+Example color combinations:
+White: (255, 255, 255) 
+Purple: (255, 0, 255) 
+Yellow: (255, 255, 0) 

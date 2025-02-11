@@ -6,6 +6,7 @@ import usb_hid
 from adafruit_hid.keyboard import Keyboard
 from adafruit_hid.keycode import Keycode
 import json
+import aesio
 
 # Define SPI pins for RP2040-Zero
 sck = board.GP2
@@ -32,6 +33,25 @@ blue_led.direction = digitalio.Direction.OUTPUT
 red_led.value = False
 green_led.value = False
 blue_led.value = False
+
+# Initialize button (connected to GPIO 14 and GND)
+button = digitalio.DigitalInOut(board.GP14)
+button.direction = digitalio.Direction.INPUT
+button.pull = digitalio.Pull.UP  # Enable internal pull-up resistor
+
+# Variables to track button state and timing
+button_was_pressed = False
+last_press_time = 0
+press_count = 0
+click_time_frame = 1  # 1-second frame to count clicks
+
+# Variables for LED modes
+blue_blinking = False
+red_blinking = False
+
+# Slot system variables
+current_slot = 1  # Start with slot 1
+max_slots = 15    # Maximum number of slots
 
 # Mapping of printable ASCII characters to Keycode
 ascii_to_keycode = {
@@ -184,45 +204,65 @@ def calculate_crc(data):
             crc &= 0xFFFF
     return crc
 
-# Function to read password from a specific slot
+# Generate a 16-byte encryption key from the UID
+def generate_encryption_key(raw_uid):
+    # Pad the UID with zeros to make it 16 bytes
+    return b'\x00' * (16 - len(raw_uid)) + bytes(raw_uid)
+
+# Decrypt a single 16-byte block using AES ECB mode
+def decrypt_block(block, key):
+    cipher = aesio.AES(key, aesio.MODE_ECB)
+    decrypted_block = bytearray(16)
+    cipher.decrypt_into(block, decrypted_block)
+    return decrypted_block
+
+# Function to read and decrypt password from a specific slot
 def read_password_from_slot(slot, raw_uid):
     sector = slot  # Slot 1 = Sector 1, Slot 2 = Sector 2, ..., Slot 15 = Sector 15
     block1 = sector * 4  # First block of the sector
     block2 = sector * 4 + 1  # Second block of the sector
     block3 = sector * 4 + 2  # Third block of the sector (length + CRC)
 
+    # Generate the encryption key from the UID
+    encryption_key = generate_encryption_key(raw_uid)
+
     # Authenticate with the default key for the sector
     if rfid.auth(rfid.AUTHENT1A, block1, default_key, raw_uid) == rfid.OK:
         print(f"Authentication for sector {sector} successful!")
 
-        # Read block 1 (first 16 bytes of password)
+        # Read block 1 (first 16 bytes of encrypted password)
         data1 = rfid.read(block1)
         if data1 is None:
             print(f"Failed to read block 1 from sector {sector}.")
             return None
 
-        # Read block 2 (next 16 bytes of password, if any)
+        # Read block 2 (next 16 bytes of encrypted password, if any)
         data2 = rfid.read(block2)
         if data2 is None:
             print(f"Failed to read block 2 from sector {sector}.")
             return None
 
-        # Read block 3 (password length + CRC)
+        # Read block 3 (encrypted CRC + password length)
         data3 = rfid.read(block3)
         if data3 is None:
             print(f"Failed to read block 3 from sector {sector}.")
             return None
 
-        # Extract CRC and password length from block 3
-        stored_crc = (data3[0] << 8) | data3[1]  # First two bytes: CRC
-        password_len = (data3[2] << 8) | data3[3]  # Next two bytes: password length
+        # Decrypt each block separately
+        decrypted_block1 = decrypt_block(bytes(data1), encryption_key)
+        decrypted_block2 = decrypt_block(bytes(data2), encryption_key) if data2 else b''
+        decrypted_block3 = decrypt_block(bytes(data3), encryption_key)
 
-        # Combine password data from block 1 and block 2
-        password_bytes = bytes(data1) + bytes(data2)
-        password_bytes = password_bytes[:password_len]  # Trim to actual password length
+        # Extract CRC and password length from decrypted block 3
+        stored_crc = (decrypted_block3[0] << 8) | decrypted_block3[1]  # First two bytes: CRC
+        password_len = (decrypted_block3[2] << 8) | decrypted_block3[3]  # Next two bytes: password length
 
-        # Calculate CRC for the password
-        calculated_crc = calculate_crc(password_bytes)
+        # Combine decrypted password blocks and trim to actual password length
+        decrypted_password_bytes = decrypted_block1 + decrypted_block2
+        decrypted_password_bytes = decrypted_password_bytes[:password_len]
+
+        # Calculate CRC for the decrypted password
+        calculated_crc = calculate_crc(decrypted_password_bytes)
 
         # Debugging: Print the stored and calculated CRC
         print(f"Stored CRC: {stored_crc:04X}")
@@ -231,7 +271,7 @@ def read_password_from_slot(slot, raw_uid):
         # Verify CRC
         if stored_crc == calculated_crc:
             # Decode the password from UTF-8 bytes
-            password = password_bytes.decode('utf-8')
+            password = decrypted_password_bytes.decode('utf-8')
             print(f"Password retrieved from slot {slot} (sector {sector}): {password}")
             return password
         else:
@@ -241,6 +281,23 @@ def read_password_from_slot(slot, raw_uid):
         print(f"Authentication for sector {sector} failed.")
         return None
 
+def turn_off_all_leds():
+    """Turn off all LEDs and reset blinking modes."""
+    global blue_blinking, red_blinking
+    red_led.value = False
+    green_led.value = False
+    blue_led.value = False
+    blue_blinking = False
+    red_blinking = False
+
+def blink_green_led(times):
+    """Blink the green LED a specified number of times."""
+    for _ in range(times):
+        green_led.value = True
+        time.sleep(0.2)
+        green_led.value = False
+        time.sleep(0.2)
+
 # Card presence tracking
 card_present = False  # Flag to track if a card is currently on the sensor
 last_card_uid = None  # Store the last detected card UID
@@ -249,11 +306,85 @@ last_detection_time = 0  # Timestamp of the last card detection
 
 # Main loop
 print("Waiting for RFID/NFC card...")
+print(f"Current slot {current_slot}.")
+blink_green_led(current_slot)
+
 while True:
     # Turn off LEDs at the start of each loop
     red_led.value = False
     green_led.value = False
     blue_led.value = False
+
+    # Check if the button is pressed (button.value is False when pressed)
+    if not button.value:
+        if not button_was_pressed:
+            # Button was just pressed
+            button_was_pressed = True
+            press_count += 1
+            last_press_time = time.monotonic()
+            print(f"Button pressed! Press count: {press_count}")  # Debugging
+    else:
+        if button_was_pressed:
+            # Button was just released
+            button_was_pressed = False
+            print("Button released!")  # Debugging
+
+    # Check if the time frame for counting clicks has passed
+    if time.monotonic() - last_press_time > click_time_frame and press_count > 0:
+        # Evaluate the number of clicks within the time frame
+        if press_count == 1:
+            # Single click logic
+            if blue_blinking or red_blinking:
+                # Turn off only blinking LEDs
+                print("Single click detected with blinking LEDs. Turning off blinking LEDs.")
+                blue_blinking = False
+                red_blinking = False
+                blue_led.value = False
+                red_led.value = False
+            elif red_led.value or green_led.value or blue_led.value:
+                # Turn off all LEDs and reset to normal operation
+                print("Single click detected with LEDs ON. Turning off all LEDs.")
+                turn_off_all_leds()
+            else:
+                # Change slot and blink green LED to indicate the selected slot
+                current_slot = (current_slot % max_slots) + 1  # Cycle through slots 1-15
+                print(f"Single click detected! Changing to slot {current_slot}.")
+                blink_green_led(current_slot)
+        elif press_count == 2:
+            # Double-click logic
+            print("Double-click detected! Blinking blue LED.")
+            blue_blinking = True
+            red_blinking = False
+            green_led.value = False
+        elif press_count == 3:
+            # Triple-click logic
+            print("Triple-click detected! Blinking red LED.")
+            red_blinking = True
+            blue_blinking = False
+            green_led.value = False
+        elif press_count == 4:
+            # Quadruple-click logic
+            print("Four-click detected! Back to Slot 1.")
+            red_blinking = False
+            blue_blinking = False
+            green_led.value = False
+            # Change slot and blink green LED to indicate the selected slot 1
+            current_slot = 1
+            print(f"Changing to slot {current_slot}.")
+            blink_green_led(current_slot)
+            current_slot = (current_slot % max_slots) + 1  # Cycle through slots 1-15
+        # Reset the press count after evaluating
+        press_count = 0
+
+    # Handle blue blinking
+    if blue_blinking:
+        blue_led.value = not blue_led.value
+        time.sleep(0.2)  # Blink every 0.5 seconds
+
+    # Handle red blinking (faster)
+    if red_blinking:
+        red_led.value = not red_led.value
+        time.sleep(0.1)  # Blink every 0.2 seconds
 
     # Scan for cards
     (status, tag_type) = rfid.request(rfid.REQIDL)
@@ -275,24 +406,14 @@ while True:
                 print("Card UID:", uid_hex)
                 print("  - tag type: 0x%02x" % tag_type)
 
-                # Prompt user to select a slot to read from
-                try:
-                    slot = int(input("Enter the slot number to read (1-15): "))
-                    if slot < 1 or slot > 15:
-                        print("Invalid slot number. Please enter a number between 1 and 15.")
-                        continue
-                except ValueError:
-                    print("Invalid input. Please enter a number.")
-                    continue
-
-                # Read password from the selected slot
-                password = read_password_from_slot(slot, raw_uid)
+                # Read and decrypt password from the selected slot
+                password = read_password_from_slot(current_slot, raw_uid)
                 if password:
                     print("Password retrieved:", password)
                     type_string(password)
                     green_led.value = True
                 else:
-                    print("Failed to read password from slot.", slot)
+                    print("Failed to read password from slot.", current_slot)
                     red_led.value = True
 
                 # Add a newline after typing
@@ -317,3 +438,4 @@ while True:
             last_card_uid = None
 
     time.sleep(0.1)  # Small delay to reduce CPU usage
+    

@@ -16,7 +16,7 @@ green_led.value = False
 blue_led.value = False
 
 # Initialize button (connected to GPIO 14 and GND)
-button = digitalio.DigitalInOut(board.GP14)
+button = digitalio.DigitalInOut(board.GP15)
 button.direction = digitalio.Direction.INPUT
 button.pull = digitalio.Pull.UP  # Enable internal pull-up resistor
 

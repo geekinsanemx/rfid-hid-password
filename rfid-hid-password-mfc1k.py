@@ -321,18 +321,17 @@ while True:
                         type_string(uid_hex)
                         blue_led.value = True
 
-                    # Add a newline after typing
-                    kbd.press(Keycode.ENTER)
-                    kbd.release_all()
-
                 else:
                     print("Authentication failed. Typing UID instead.")
                     type_string(uid_hex)
                     blue_led.value = True
-                    kbd.press(Keycode.ENTER)
-                    kbd.release_all()
+
+                # Add a newline after typing
+                kbd.press(Keycode.ENTER)
+                kbd.release_all()
 
                 rfid.stop_crypto1()
+                time.sleep(1)
 
             else:
                 # Card is still present, but we've already processed it
