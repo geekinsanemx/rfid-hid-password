@@ -310,8 +310,8 @@ async def handle_button():
                 print(f"Single click detected. Current slot: {current_slot}")
                 await blink_green_led(current_slot)
 
-    # Reset the press count after evaluating
-    press_count = 0
+            # Reset the press count after evaluating
+            press_count = 0
 
         await asyncio.sleep(0.05)
 
